@@ -36,6 +36,7 @@ namespace PERIPHERALS
     PERIPHERAL_BUS_USB,
     PERIPHERAL_BUS_PCI,
     PERIPHERAL_BUS_RPI
+    PERIPHERAL_BUS_IP
   };
 
   enum PeripheralFeature
@@ -48,7 +49,8 @@ namespace PERIPHERALS
     FEATURE_CEC,
     FEATURE_BLUETOOTH,
     FEATURE_TUNER,
-    FEATURE_IMON
+    FEATURE_IMON,
+    FEATURE_AMBIPI
   };
 
   enum PeripheralType
@@ -61,7 +63,8 @@ namespace PERIPHERALS
     PERIPHERAL_CEC,
     PERIPHERAL_BLUETOOTH,
     PERIPHERAL_TUNER,
-    PERIPHERAL_IMON 
+    PERIPHERAL_IMON,
+    PERIPHERAL_AMBIPI
   };
 
   struct PeripheralID
@@ -87,6 +90,8 @@ namespace PERIPHERALS
     {
       switch (type)
       {
+      case PERIPHERAL_AMBIPI:
+        return "ambipi";
       case PERIPHERAL_BLUETOOTH:
         return "bluetooth";
       case PERIPHERAL_CEC:
@@ -113,7 +118,9 @@ namespace PERIPHERALS
       CStdString strTypeLowerCase(strType);
       strTypeLowerCase.ToLower();
 
-      if (strTypeLowerCase.Equals("bluetooth"))
+      if (strTypeLowerCase.Equals("ambipi"))
+        return PERIPHERAL_AMBIPI;
+      else if (strTypeLowerCase.Equals("bluetooth"))
         return PERIPHERAL_BLUETOOTH;
       else if (strTypeLowerCase.Equals("cec"))
         return PERIPHERAL_CEC;
@@ -143,6 +150,8 @@ namespace PERIPHERALS
         return "pci";
       case PERIPHERAL_BUS_RPI:
         return "rpi";
+      case PERIPHERAL_BUS_IP:
+        return "ip";
       default:
         return "unknown";
       }
@@ -153,12 +162,14 @@ namespace PERIPHERALS
       CStdString strTypeLowerCase(strType);
       strTypeLowerCase.ToLower();
 
-      if (strTypeLowerCase.Equals("usb"))
-        return PERIPHERAL_BUS_USB;
+      if (strTypeLowerCase.Equals("ip"))
+        return PERIPHERAL_BUS_IP;
       else if (strTypeLowerCase.Equals("pci"))
         return PERIPHERAL_BUS_PCI;
       else if (strTypeLowerCase.Equals("rpi"))
         return PERIPHERAL_BUS_RPI;
+      else if (strTypeLowerCase.Equals("usb"))
+        return PERIPHERAL_BUS_USB;
 
       return PERIPHERAL_BUS_UNKNOWN;
     };

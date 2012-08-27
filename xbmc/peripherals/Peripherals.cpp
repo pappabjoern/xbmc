@@ -25,10 +25,12 @@
 #include "devices/PeripheralHID.h"
 #include "devices/PeripheralNIC.h"
 #include "devices/PeripheralNyxboard.h"
+#include "devices/PeripheralAmbiPi.h"
 #include "devices/PeripheralTuner.h"
 #include "devices/PeripheralCecAdapter.h"
 #include "devices/PeripheralImon.h"
 #include "bus/PeripheralBusUSB.h"
+#include "bus/PeripheralBusIP.h"
 #include "dialogs/GUIDialogPeripheralManager.h"
 
 #ifdef HAVE_CEC_RPI_API
@@ -86,6 +88,10 @@ void CPeripherals::Initialise(void)
 #endif
 #ifdef HAVE_CEC_RPI_API
     m_busses.push_back(new CPeripheralBusRPi(this));
+#endif
+
+#if defined(HAVE_PERIPHERAL_BUS_IP)
+	m_busses.push_back(new CPeripheralBusIP(this));
 #endif
 
     /* initialise all known busses */
@@ -264,6 +270,10 @@ CPeripheral *CPeripherals::CreatePeripheral(CPeripheralBus &bus, const Periphera
 
   case PERIPHERAL_NYXBOARD:
     peripheral = new CPeripheralNyxboard(type, bus.Type(), strLocation, strDeviceName, iVendorId, iProductId);
+    break;
+
+  case PERIPHERAL_AMBIPI:
+    peripheral = new CPeripheralAmbiPi(type, bus.Type(), strLocation, strDeviceName, iVendorId, iProductId);
     break;
 
   case PERIPHERAL_TUNER:
