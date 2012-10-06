@@ -413,6 +413,9 @@ CApplication::CApplication(void)
   m_bPlaybackStarting = false;
   m_skinReloading = false;
 
+  m_RenderCompleteCallBackFn = NULL;
+  m_RenderCompleteCallBackCtx = NULL;
+
 #ifdef HAS_GLX
   XInitThreads();
 #endif
@@ -2351,6 +2354,10 @@ void CApplication::Render()
   // fresh for the next process(), or after a windowclose animation (where process()
   // isn't called)
   g_infoManager.ResetCache();
+
+  if (m_RenderCompleteCallBackFn)
+	  (*m_RenderCompleteCallBackFn)(m_RenderCompleteCallBackCtx);
+
   lock.Leave();
 
   unsigned int now = XbmcThreads::SystemClockMillis();
@@ -2390,6 +2397,12 @@ void CApplication::Render()
       m_frameCount--;
   }
   m_frameCond.notifyAll();
+}
+
+void CApplication::RegisterRenderCompleteCallBack(const void *ctx, RenderCompleteCallBackFn fn)
+{
+  m_RenderCompleteCallBackFn = fn;
+  m_RenderCompleteCallBackCtx = ctx;
 }
 
 void CApplication::SetStandAlone(bool value)
