@@ -24,47 +24,58 @@
 
 #include "Application.h"
 #include "utils/Screenshot.h"
+#include "cores/VideoRenderers/RenderManager.h"
 
 #define AMBIPI_DEFAULT_PORT 20434
 
 extern CApplication g_application;
+extern CXBMCRenderManager g_renderManager;
 
 using namespace PERIPHERALS;
 using namespace AUTOPTR;
 
 CPeripheralAmbiPi::CPeripheralAmbiPi(const PeripheralType type, const PeripheralBusType busType, const CStdString &strLocation, const CStdString &strDeviceName, int iVendorId, int iProductId) :
   CPeripheral(type, busType, strLocation, strDeviceName, iVendorId, iProductId),
+  CThread("AmbiPiCapture"),
+  m_bStarted(false),
+  m_bIsRunning(false),
   m_pGrid(NULL),
   m_previousImageWidth(0),
   m_previousImageHeight(0),
   m_lastFrameTime(0)
 {  
   m_features.push_back(FEATURE_AMBIPI);
-  ConfigureRenderCompleteCallback();
 }
 
 CPeripheralAmbiPi::~CPeripheralAmbiPi(void)
 {
   CLog::Log(LOGDEBUG, "%s - Removing AmbiPi on %s", __FUNCTION__, m_strLocation.c_str());
 
-  DisconnectFromDevice();
+  StopCapture();
 
-  ReleaseImage();
   delete m_pGrid;
+}
+
+void CPeripheralAmbiPi::StopCapture(void)
+{
+  if (IsRunning()) {
+    StopThread(true);
+  }
 }
 
 bool CPeripheralAmbiPi::InitialiseFeature(const PeripheralFeature feature)
 {
-  if (feature != FEATURE_AMBIPI || !GetSettingBool("enabled")) {
+  if (feature != FEATURE_AMBIPI || m_bStarted || !GetSettingBool("enabled")) {
     return CPeripheral::InitialiseFeature(feature);
   }
 
   CLog::Log(LOGDEBUG, "%s - Initialising AmbiPi on %s", __FUNCTION__, m_strLocation.c_str());
 
   LoadAddressFromConfiguration();
-  UpdateGridFromConfiguration();
+  UpdateGridFromConfiguration();  
 
-  ConnectToDevice();
+  m_bStarted = true;
+  Create();
 
   return CPeripheral::InitialiseFeature(feature);
 }
@@ -93,26 +104,70 @@ void CPeripheralAmbiPi::UpdateGridFromConfiguration()
   if (m_pGrid)
     delete m_pGrid;
 
-  m_pGrid = new CAmbiPiGrid(width, height);
+  m_pGrid = new CAmbiPiGrid(width, height);  
 
+  ConfigureCaptureSize();
 }
 
-void CPeripheralAmbiPi::ConfigureRenderCompleteCallback()
+#define WAIT_DELAY 1000
+
+void CPeripheralAmbiPi::Process(void)
 {
-  g_application.RegisterRenderCompleteCallBack((const void*)this, RenderCompleteCallBack);
+  {
+    CSingleLock lock(m_critSection);
+    m_bIsRunning = true;
+  }
+
+  ConnectToDevice();  
+
+  m_capture = g_renderManager.AllocRenderCapture();
+
+  g_renderManager.Capture(m_capture, m_captureWidth, m_captureHeight, CAPTUREFLAG_CONTINUOUS);
+  while (!m_bStop)
+  {
+    m_capture->GetEvent().WaitMSec(WAIT_DELAY);
+    if (m_capture->GetUserState() != CAPTURESTATE_DONE)
+      continue;
+
+    if (!ShouldProcessImage()) 
+      continue;
+
+    ProcessImage();
+  }
+  g_renderManager.ReleaseRenderCapture(m_capture);
+
+  DisconnectFromDevice();
+
+  {
+    CSingleLock lock(m_critSection);
+    m_bStarted = false;
+    m_bIsRunning = false;
+  }
 }
 
-void CPeripheralAmbiPi::RenderCompleteCallBack(const void *ctx)
+void CPeripheralAmbiPi::ConnectToDevice()
 {
-  CPeripheralAmbiPi *peripheralAmbiPi = (CPeripheralAmbiPi*)ctx;
+  CLog::Log(LOGINFO, "%s - Connecting to AmbiPi on %s:%d", __FUNCTION__, m_address.c_str(), m_port);  
 
-  peripheralAmbiPi->ProcessImage();
+  m_connection.Disconnect();
+  m_connection.Connect(m_address, m_port);
+}
+
+void CPeripheralAmbiPi::ProcessImage()
+{
+  GenerateDataStreamFromImage();
+  SendData();
 }
 
 #define MAX_FRAMES_PER_SECOND 30
 #define MIN_FRAME_DELAY (1000 / MAX_FRAMES_PER_SECOND)
 
 bool CPeripheralAmbiPi::ShouldProcessImage()
+{
+  return m_connection.IsConnected();// && HasMinimumFrameTimePassed();
+}
+
+bool CPeripheralAmbiPi::HasMinimumFrameTimePassed()
 {
   unsigned int now = XbmcThreads::SystemClockMillis();
   bool shouldProcess = now > m_lastFrameTime + MIN_FRAME_DELAY;
@@ -124,42 +179,11 @@ bool CPeripheralAmbiPi::ShouldProcessImage()
   return shouldProcess;
 }
 
-void CPeripheralAmbiPi::ProcessImage()
-{
-
-  if (!ShouldProcessImage()) 
-    return;
-
-  if (!m_connection.IsConnected())
-    return;
-
-  if (!UpdateImage())
-    return;  
-
-  GenerateDataStreamFromImage();
-  SendData();
-}
-
-void CPeripheralAmbiPi::ReleaseImage()
-{
-  if (!m_screenshotSurface.m_buffer)
-    return;
-
-  delete m_screenshotSurface.m_buffer;
-}
-
-bool CPeripheralAmbiPi::UpdateImage()
-{
-  ReleaseImage();
-
-  return m_screenshotSurface.CaptureBufferDuringLock();
-}
-
 void CPeripheralAmbiPi::GenerateDataStreamFromImage()
 {
-  UpdateSampleRectangles(m_screenshotSurface.m_width, m_screenshotSurface.m_height);
+  UpdateSampleRectangles(m_captureWidth, m_captureHeight);
 
-  m_pGrid->UpdateTilesFromImage(&m_screenshotSurface);
+  m_pGrid->UpdateTilesFromImage(m_capture);
 }
 
 void CPeripheralAmbiPi::UpdateSampleRectangles(unsigned int imageWidth, unsigned int imageHeight)
@@ -182,12 +206,12 @@ void CPeripheralAmbiPi::SendData(void) {
   }
 }
 
-void CPeripheralAmbiPi::ConnectToDevice()
+void CPeripheralAmbiPi::ConfigureCaptureSize()
 {
-  CLog::Log(LOGINFO, "%s - Connecting to AmbiPi on %s:%d", __FUNCTION__, m_address.c_str(), m_port);  
+  float aspectRatio = m_pGrid->GetAspectRatio();
 
-  m_connection.Disconnect();
-  m_connection.Connect(m_address, m_port);
+  m_captureWidth = (100);
+  m_captureHeight = (int)(m_captureWidth / aspectRatio);
 }
 
 void CPeripheralAmbiPi::OnSettingChanged(const CStdString &strChangedSetting)
@@ -201,7 +225,12 @@ void CPeripheralAmbiPi::OnSettingChanged(const CStdString &strChangedSetting)
 void CPeripheralAmbiPi::DisconnectFromDevice(void)
 {
   CLog::Log(LOGDEBUG, "%s - disconnecting from the AmbiPi", __FUNCTION__);
-
   m_connection.Disconnect();
+}
+
+bool CPeripheralAmbiPi::IsRunning(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_bIsRunning;
 }
 

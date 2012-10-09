@@ -24,14 +24,15 @@
 #include "threads/Thread.h"
 #include "threads/CriticalSection.h"
 
+#include "cores/VideoRenderers/RenderCapture.h"
+
 #include "Peripheral.h"
 #include "peripherals/devices/ambipi/AmbiPiConnection.h"
 #include "peripherals/devices/ambipi/AmbiPiGrid.h"
 
 namespace PERIPHERALS
 {
-
-  class CPeripheralAmbiPi : public CPeripheral
+  class CPeripheralAmbiPi : public CPeripheral, private CThread
   {
   public:
     CPeripheralAmbiPi(const PeripheralType type, const PeripheralBusType busType, const CStdString &strLocation, const CStdString &strDeviceName, int iVendorId, int iProductId);
@@ -42,34 +43,45 @@ namespace PERIPHERALS
   protected:
 	  bool InitialiseFeature(const PeripheralFeature feature);
 
-    void ConnectToDevice(void);
-    void DisconnectFromDevice(void);
+  private:
+    CAmbiPiConnection                 m_connection;
 
-    void LoadAddressFromConfiguration(void);
-    void ConfigureRenderCompleteCallback(void);
+    CCriticalSection                  m_critSection;
+    CRenderCapture*                   m_capture;
+    unsigned int                      m_captureWidth;
+    unsigned int                      m_captureHeight;
+
+    CAmbiPiGrid*                      m_pGrid;
+    unsigned int                      m_previousImageWidth;
+    unsigned int                      m_previousImageHeight;
+
+    unsigned int                      m_lastFrameTime;
+
+    bool                              m_bStarted;
+    bool                              m_bIsRunning;
+    int                               m_port;
+    CStdString                        m_address;
+
+    void Process(void);
+    void StopCapture(void);
+    bool IsRunning(void) const;
 
     void ProcessImage(void);
-    bool UpdateImage(void);
-    void ReleaseImage(void);
     void GenerateDataStreamFromImage(void);
     void UpdateGridFromConfiguration(void);
     void SendData(void);
 
-    int                               m_port;
-    CStdString                        m_address;
+    void ConnectToDevice(void);
+    void DisconnectFromDevice(void);
 
-  private:
-    CCriticalSection                  m_critSection;
-    CScreenshotSurface                m_screenshotSurface;
-    CAmbiPiGrid*                      m_pGrid;
-    unsigned int                      m_previousImageWidth;
-    unsigned int                      m_previousImageHeight;
-    unsigned int                      m_lastFrameTime;
+    void LoadAddressFromConfiguration(void);
 
-    static void RenderCompleteCallBack(const void *ctx);
-    bool ShouldProcessImage();
+
+    bool ShouldProcessImage(void);
+    bool HasMinimumFrameTimePassed(void);
+
+    void ConfigureCaptureSize(void);
 
     void UpdateSampleRectangles(unsigned int imageWidth, unsigned int imageHeight);
-    CAmbiPiConnection                 m_connection;
   };
 }

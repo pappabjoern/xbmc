@@ -22,10 +22,9 @@
 
 #include "system.h"
 
-#include "utils/Screenshot.h"
 #include "guilib/Geometry.h"
-
 #include "cores/VideoRenderers/BaseRenderer.h"
+#include "cores/VideoRenderers/RenderCapture.h"
 
 namespace PERIPHERALS
 {
@@ -60,8 +59,12 @@ namespace PERIPHERALS
     CAmbiPiGrid(unsigned int width, unsigned int height);
     ~CAmbiPiGrid(void);
     void UpdateSampleRectangles(unsigned int imageWidth, unsigned int imageHeight);
-    void UpdateTilesFromImage(const CScreenshotSurface* pImage);
+    void UpdateTilesFromImage(CRenderCapture* pCapture);
     TileData *GetTileData(void);
+
+    unsigned int GetWidth(void);
+    unsigned int GetHeight(void);
+    float GetAspectRatio(void);
 
   protected:
     unsigned int m_width;
@@ -80,7 +83,7 @@ namespace PERIPHERALS
     void GrowSampleRectangleInwards(Tile *pTile, unsigned int sampleWidth, unsigned int sampleHeight);
 
     unsigned long int CalculatePixelsInTile(Tile *pTile);
-    void CalculateAverageColorForTile(const CScreenshotSurface* pSurface, Tile *pTile);
+    void CalculateAverageColorForTile(CRenderCapture* pCapture, Tile *pTile);
     void UpdateAverageColorForTile(Tile *pTile, const AverageRGB *pAverageRgb);
     void UpdateAverageRgb(const RGB *pRgb, unsigned long int totalSamples, AverageRGB *pAverageRgb);
   };

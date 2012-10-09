@@ -228,7 +228,7 @@ void CAmbiPiGrid::GrowSampleRectangleInwards(Tile *pTile, unsigned int sampleWid
 #define PLANE_U 1
 #define PLANE_V 2
 
-void CAmbiPiGrid::UpdateTilesFromImage(const CScreenshotSurface* pSurface)
+void CAmbiPiGrid::UpdateTilesFromImage(CRenderCapture* pCapture)
 {
   unsigned int tileIndex = 0;
   Tile* pTile;
@@ -236,28 +236,33 @@ void CAmbiPiGrid::UpdateTilesFromImage(const CScreenshotSurface* pSurface)
   while (tileIndex < m_numTiles) {
 
     pTile = m_tiles + tileIndex;
-    CalculateAverageColorForTile(pSurface, pTile);
+    CalculateAverageColorForTile(pCapture, pTile);
     tileIndex++;
   }  
 }
 
 #define STEP 2
 
-void CAmbiPiGrid::CalculateAverageColorForTile(const CScreenshotSurface* pSurface, Tile *pTile) 
+void CAmbiPiGrid::CalculateAverageColorForTile(CRenderCapture* pCapture, Tile *pTile) 
 {
   AverageRGB averageRgb = { 0, 0, 0 };
-  RGB rgb;
+  RGB rgb = {0,0,0};
   unsigned long int samplesToTake = CalculatePixelsInTile(pTile) / STEP;
 
   for (int y = (int)pTile->m_sampleRect.y1; y < pTile->m_sampleRect.y2; y++)
   {
     for (int x = (int)pTile->m_sampleRect.x1; x < pTile->m_sampleRect.x2; x += STEP)
     {
-      BGRA *pPixel = (BGRA *)(pSurface->m_buffer) + (y * pSurface->m_width) + x;
+#ifdef HAS_DX
+      BGRA *pPixel = (BGRA *)(pCapture->GetPixels()) + (y * pCapture->GetWidth()) + x;
 
       rgb.r = pPixel->r;
       rgb.g = pPixel->g;
       rgb.b = pPixel->b;
+#endif
+#if defined(HAS_GL)
+      // TODO add support for non DX systems
+#endif
 
       UpdateAverageRgb(&rgb, samplesToTake, &averageRgb);
     }
@@ -293,4 +298,20 @@ void CAmbiPiGrid::UpdateAverageColorForTile(Tile *pTile, const AverageRGB *pAver
   pTile->m_rgb.r = (BYTE)pAverageRgb->r;
   pTile->m_rgb.g = (BYTE)pAverageRgb->g;
   pTile->m_rgb.b = (BYTE)pAverageRgb->b;
+}
+
+unsigned int CAmbiPiGrid::GetHeight()
+{
+  return m_height;
+}  
+
+unsigned int CAmbiPiGrid::GetWidth()
+{
+  return m_width;
+}  
+
+
+float CAmbiPiGrid::GetAspectRatio()
+{
+    return (float)m_width / (float)m_height;
 }
