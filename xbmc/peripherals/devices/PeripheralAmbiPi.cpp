@@ -27,13 +27,13 @@
 
 #define AMBIPI_DEFAULT_PORT 20434
 
-extern CApplication g_application;
+//extern CApplication g_application;
 
 using namespace PERIPHERALS;
 using namespace AUTOPTR;
 
-CPeripheralAmbiPi::CPeripheralAmbiPi(const PeripheralType type, const PeripheralBusType busType, const CStdString &strLocation, const CStdString &strDeviceName, int iVendorId, int iProductId) :
-  CPeripheral(type, busType, strLocation, strDeviceName, iVendorId, iProductId),
+CPeripheralAmbiPi::CPeripheralAmbiPi(const PeripheralScanResult& scanResult) :
+  CPeripheral(scanResult),
   m_pGrid(NULL),
   m_previousImageWidth(0),
   m_previousImageHeight(0),
