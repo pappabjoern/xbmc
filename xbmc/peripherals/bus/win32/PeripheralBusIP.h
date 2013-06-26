@@ -32,11 +32,11 @@ namespace PERIPHERALS
    * @class CPeripheralBusIP
    * This represents an IP bus on the system to support devices connected to the machine running XBMC via tcp/ip.
    *
-   * TODO Implement support for non-hardcoded ip addresses and ports
+   * TODO Implement support for devices with dynamic ip addresses and ports
    *  Either find devices by a) checking the manager's peripheral mappings and connect to devices (simple)
-   *  b) OR issue a speacial new XBMC broadcast on the lan and process anything that comes back (hard)
+   *  b) OR issue a speacial new XBMC broadcast/appropriate discovery on the lan and process anything that comes back (hard)
    *
-   * TODO Current implementation only supports a single AmbiPi device
+   * Current implementation only supports a single AmbiPi device on a configured IP
    */
   class CPeripheralBusIP : public CPeripheralBus    
   {
